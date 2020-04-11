@@ -1,0 +1,16 @@
+apiVersion : apps/v1beta1
+kind: Deployment
+metadata:
+  name: "kishkube"
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: "kishkube"
+    spec:
+      containers:
+        - name: "kishkube"
+          image: "kishreg.azurecr.io/kishkube"
+          ports:
+          - containerPort: 44123
