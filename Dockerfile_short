@@ -1,0 +1,7 @@
+FROM microsoft/dotnet:latest
+
+WORKDIR /app
+
+COPY ./src/saveMeMvc2/publish .
+
+ENTRYPOINT ["dotnet", "saveMeMvc2.dll"]
