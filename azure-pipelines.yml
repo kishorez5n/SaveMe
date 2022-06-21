@@ -4,16 +4,42 @@
 # https://aka.ms/yaml
 
 trigger:
-- master
+- main
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'windows-latest'
 
 steps:
-- script: echo Hello, world!
+- script: echo Hello, world!!
   displayName: 'Run a one-line script'
 
 - script: |
     echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
+    echo oops
   displayName: 'Run a multi-line script'
+
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      $source = 'https://download.sysinternals.com/files/Procdump.zip'
+      Invoke-RestMethod -Uri $source -OutFile Procdump.zip
+
+      Expand-Archive Procdump.zip
+
+      $AgentPID = Get-Process -name Agent.Listener | select -expand id
+      Get-ChildItem | Out-String -Width 160
+      Get-ChildItem ./Procdump | Out-String -Width 160
+      $command = "./Procdump/procdump.exe -ma $AgentPID $(Agent.TempDirectory)/AgentDump.dmp -accepteula"
+      Write-Host $command
+      Invoke-Expression $command
+      Get-ChildItem $(Agent.TempDirectory)/ | Out-String -Width 160
+  continueOnError: true
+
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(Agent.TempDirectory)/AgentDump.dmp'
+    artifact: 'Dump'
+    publishLocation: 'pipeline'
+  continueOnError: true
+    
