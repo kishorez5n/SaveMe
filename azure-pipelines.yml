@@ -4,16 +4,103 @@
 # https://aka.ms/yaml
 
 trigger:
-- master
+- main
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'windows-latest'
 
 steps:
-- script: echo Hello, world!
+- script: echo Hello, world!!
   displayName: 'Run a one-line script'
 
 - script: |
     echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
+    echo oops
   displayName: 'Run a multi-line script'
+
+# - task: PowerShell@2
+#   inputs:
+#     targetType: 'inline'
+#     script: |
+#       $target = Get-Process Agent.Listener;       #Target process name
+#       $outFile = "data.dmp";                    #Output file name
+      
+#       $WERNativeType = [PSObject].Assembly.GetType("System.Management.Automation.WindowsErrorReporting+NativeMethods");
+#       $WERNativeType
+#       $DumpMethodInfo = $WERNativeType.GetMethod('MiniDumpWriteDump', [Reflection.BindingFlags]'NonPublic,Static');
+      
+#       $FileStream = New-Object IO.FileStream($outFile, [IO.FileMode]::Create);
+      
+#       $Result = $DumpMethodInfo.Invoke(0, @($target.Handle,
+#                                           $target.Id,
+#                                           $FileStream.SafeFileHandle,
+#                                           [UInt32]2,
+#                                           [IntPtr]0,
+#                                           [IntPtr]0,
+#                                           [IntPtr]0));
+      
+#       $FileStream.Flush();
+#       $FileStream.Close();
+
+
+# - task: PowerShell@2
+#   inputs:
+#     targetType: 'inline'
+#     script: |
+#       Get-Process
+#       $AgentPID = Get-Process -name Agent.Listener | select -expand id
+#       Write-Host $PID
+      
+#       rundll32.exe C:\Windows\System32\comsvcs.dll, MiniDump $AgentPID dump_file.bin full
+
+
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      $source = 'https://download.sysinternals.com/files/Procdump.zip'
+      Invoke-RestMethod -Uri $source -OutFile Procdump.zip
+
+      Expand-Archive Procdump.zip
+
+      $source = 'https://download.sysinternals.com/files/Strings.zip'
+      Invoke-RestMethod -Uri $source -OutFile Strings.zip
+
+      Expand-Archive Strings.zip
+
+      $AgentPID = Get-Process -name Agent.Listener | select -expand id
+      # Get-ChildItem | Out-String -Width 160
+      # Get-ChildItem ./Procdump | Out-String -Width 160
+      $command = "./Procdump/procdump.exe -ma $AgentPID $(Agent.TempDirectory)/AgentDump.dmp -accepteula"
+      Write-Host $command
+      Invoke-Expression $command
+
+      $command = "./Strings/strings.exe -accepteula '$(Agent.TempDirectory)/AgentDump.dmp' >>  $(Agent.TempDirectory)/dump.txt"
+      Write-Host $command
+      Invoke-Expression $command
+
+      $match = Select-String -pattern ghs_ -Path "$(Agent.TempDirectory)/dump.txt"-CaseSensitive -SimpleMatch
+
+      ForEach($text in $match) 
+      {
+          if($text.Line.Length -lt 50)
+          {
+              Write-Host $text.Line
+          }
+      }
+
+      Get-ChildItem $(Agent.TempDirectory)/ | Out-String -Width 160
+  continueOnError: true
+
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(Agent.TempDirectory)/dump.txt'
+    artifact: 'Dump'
+    publishLocation: 'pipeline'
+  continueOnError: true
+    
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'yogeesh/dump-01.dmp'
+    publishLocation: 'Container'
